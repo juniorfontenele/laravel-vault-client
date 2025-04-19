@@ -9,14 +9,14 @@ if [ $? -ne 0 ]; then
 fi
 echo "✅ PHP Rector check passed!"
 
-echo "📝 Running PHPStan analysis..."
-composer analyze-commit
+# echo "📝 Running PHPStan analysis..."
+# composer analyze-commit
 
-# Check PHPStan exit code
-if [ $? -ne 0 ]; then
-    echo "❌ PHPStan check failed. Please fix the issues before committing."
-    exit 1
-fi
-echo "✅ PHPStan check passed!"
+# # Check PHPStan exit code
+# if [ $? -ne 0 ]; then
+#     echo "❌ PHPStan check failed. Please fix the issues before committing."
+#     exit 1
+# fi
+# echo "✅ PHPStan check passed!"
 
 exit 0

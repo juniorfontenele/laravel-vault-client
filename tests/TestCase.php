@@ -58,6 +58,10 @@ class TestCase extends OrchestraTestCase
                 'database' => ':memory:',
                 'prefix' => '',
             ]);
+
+            $config->set('vault.client_id', 'test-client-id');
+            $config->set('vault.url', 'https://vault.example.com');
+            $config->set('vault.issuer', 'https://vault.example.com');
         });
     }
 

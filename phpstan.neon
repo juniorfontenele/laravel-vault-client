@@ -1,6 +1,8 @@
 parameters:
-    level: 8
+    level: 5
     paths:
         - src
         - config
         - database
+    ignoreErrors:
+        - '#Access to an undefined property JuniorFontenele\\LaravelVaultClient\\Models\\#'

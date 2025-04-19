@@ -69,7 +69,7 @@ class VaultClientService
                 'response' => $response->json(),
             ]);
 
-            throw new VaultException('Failed to rotate the key: ' . $response->json('error') ?? 'Unknown error');
+            throw new VaultException('Failed to rotate the key: ' . ($response->json('error') ?? 'Unknown error'));
         }
 
         $data = $response->json();
@@ -89,8 +89,18 @@ class VaultClientService
         return $newKey;
     }
 
+    /**
+     * Sign the JWT token.
+     *
+     * @param PrivateKey $privateKey
+     * @param array<string, mixed> $claims
+     * @param array<string, mixed> $headers
+     * @param array<string> $scope
+     * @return string
+     */
     public function sign(PrivateKey $privateKey, ?array $scope = [], array $claims = [], array $headers = []): string
     {
+        /** @var string $kid */
         $kid = $privateKey->id;
         $headers['kid'] = $kid;
 
@@ -150,7 +160,7 @@ class VaultClientService
     {
         $privateKey = PrivateKey::getPrivateKey();
 
-        if (!$privateKey instanceof \JuniorFontenele\LaravelVaultClient\Models\PrivateKey) {
+        if (! $privateKey instanceof PrivateKey) {
             throw new VaultException('No valid key found for the client.');
         }
 

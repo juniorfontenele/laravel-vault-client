@@ -6,9 +6,8 @@ namespace JuniorFontenele\LaravelVaultClient\Http\Middlewares;
 
 use Closure;
 use Illuminate\Http\Request;
+use JuniorFontenele\LaravelVaultClient\Facades\VaultClient;
 use Throwable;
-use VaultJWT;
-use VaultKey;
 
 class ValidateJwtToken
 {
@@ -21,13 +20,13 @@ class ValidateJwtToken
                 return response()->json(['error' => 'Token not provided'], 401);
             }
 
-            $kid = VaultJWT::getKidFromJwt($token);
+            $kid = VaultClient::getKidFromJwt($token);
 
             if (empty($kid)) {
                 return response()->json(['error' => 'Kid not found in JWT'], 401);
             }
 
-            $key = VaultKey::findByKid($kid);
+            $key = VaultClient::findByKid($kid);
 
             if (empty($key)) {
                 return response()->json(['error' => 'Public key not found for kid: ' . $kid], 401);
@@ -37,7 +36,7 @@ class ValidateJwtToken
                 return response()->json(['error' => 'Public key is expired, revoked or not valid yet'], 401);
             }
 
-            $decodedJwt = VaultJWT::decode($token, $key->public_key);
+            $decodedJwt = VaultClient::decode($token, $key->public_key);
 
             $payload = (array) $decodedJwt;
 
