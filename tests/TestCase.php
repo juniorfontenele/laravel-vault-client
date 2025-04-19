@@ -51,6 +51,7 @@ class TestCase extends OrchestraTestCase
             $config->set('app.timezone', 'UTC');
             $config->set('app.locale', 'en');
             $config->set('app.fallback_locale', 'en');
+            $config->set('app.url', 'https://example.com');
 
             $config->set('database.default', 'sqlite');
             $config->set('database.connections.sqlite', [

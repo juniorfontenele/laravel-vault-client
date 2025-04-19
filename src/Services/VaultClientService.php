@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use JuniorFontenele\LaravelVaultClient\Exceptions\JwtException;
 use JuniorFontenele\LaravelVaultClient\Exceptions\VaultException;
 use JuniorFontenele\LaravelVaultClient\Models\PrivateKey;
 
@@ -20,7 +21,7 @@ class VaultClientService
         $this->vaultUrl = rtrim($this->vaultUrl, '/');
     }
 
-    public function getPublicKey(string $kid): ?string
+    public function getPublicKey(string $kid): ?array
     {
         return Cache::remember('vault:kid:' . $kid, $this->cacheTtl, function () use ($kid) {
             $url = $this->vaultUrl . '/kms/' . $kid;
@@ -38,7 +39,7 @@ class VaultClientService
                 return null;
             }
 
-            return $response->json('public_key');
+            return $response->json() ?? null;
         });
     }
 
@@ -120,21 +121,58 @@ class VaultClientService
         return JWT::encode($claims, $privateKey->private_key, 'RS256', $headers['kid'], $headers);
     }
 
-    public function validate(string $jwt): object
+    public function validate(string $jwt, $scopes = []): void
     {
         $kid = $this->getKidFromJwtString($jwt);
 
-        if ($kid === null || $kid === '' || $kid === '0') {
-            throw new VaultException('Kid not found in JWT');
+        if (! $kid) {
+            throw new JwtException('Kid not found in JWT');
         }
 
         $publicKey = $this->getPublicKey($kid);
 
-        if ($publicKey === null || $publicKey === '' || $publicKey === '0') {
+        if (! $publicKey) {
             throw new VaultException('Public key not found for kid: ' . $kid);
         }
 
-        return $this->decode($jwt, $publicKey);
+        $decodedJwt = $this->decode($jwt, $publicKey['public_key']);
+
+        $payload = (array) $decodedJwt;
+
+        if (empty($payload['nonce'])) {
+            throw new JwtException('Nonce not found in JWT');
+        }
+
+        if (Cache::has('vault:nonce:' . $payload['nonce'])) {
+            throw new JwtException('Nonce already used');
+        }
+
+        if (empty($payload['jti'])) {
+            throw new JwtException('JTI not found in JWT');
+        }
+
+        if (Cache::has('vault:jti:' . $payload['jti'])) {
+            throw new JwtException('Token is blacklisted');
+        }
+
+        if ($payload['client_id'] !== $publicKey['client_id']) {
+            throw new JwtException('Invalid client_id');
+        }
+
+        if ($scopes !== null && $scopes !== []) {
+            $scopes = array_map('strtolower', $scopes);
+
+            $tokenScopes = explode(' ', $payload['scope'] ?? '');
+
+            foreach ($scopes as $scope) {
+                if (! in_array($scope, $tokenScopes)) {
+                    throw new JwtException('Insufficient scope');
+                }
+            }
+        }
+
+        Cache::put('vault:nonce:' . $payload['nonce'], true, $payload['exp'] - time());
+        Cache::put('vault:jti:' . $payload['jti'], true, $payload['exp'] - time());
     }
 
     public function getKidFromJwtString(string $jwt): ?string
@@ -165,5 +203,13 @@ class VaultClientService
         }
 
         return $privateKey;
+    }
+
+    public function validateJwt(string $publicKey): bool
+    {
+        $publicKey = str_replace(['-----BEGIN PUBLIC KEY-----', '-----END PUBLIC KEY-----'], '', $publicKey);
+        $publicKey = str_replace("\n", '', $publicKey);
+
+        return Str::length($publicKey) === 256;
     }
 }

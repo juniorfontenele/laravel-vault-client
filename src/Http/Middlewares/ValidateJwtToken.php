@@ -6,8 +6,10 @@ namespace JuniorFontenele\LaravelVaultClient\Http\Middlewares;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use JuniorFontenele\LaravelVaultClient\Exceptions\JwtException;
+use JuniorFontenele\LaravelVaultClient\Exceptions\VaultException;
 use JuniorFontenele\LaravelVaultClient\Facades\VaultClient;
-use Throwable;
 
 class ValidateJwtToken
 {
@@ -20,50 +22,38 @@ class ValidateJwtToken
                 return response()->json(['error' => 'Token not provided'], 401);
             }
 
-            $kid = VaultClient::getKidFromJwt($token);
-
-            if (empty($kid)) {
-                return response()->json(['error' => 'Kid not found in JWT'], 401);
-            }
-
-            $key = VaultClient::findByKid($kid);
-
-            if (empty($key)) {
-                return response()->json(['error' => 'Public key not found for kid: ' . $kid], 401);
-            }
-
-            if ($key->isInvalid()) {
-                return response()->json(['error' => 'Public key is expired, revoked or not valid yet'], 401);
-            }
-
-            $decodedJwt = VaultClient::decode($token, $key->public_key);
-
-            $payload = (array) $decodedJwt;
-
-            // Validate nonce
-            // Check blacklisted token
-
-            if ($payload['client_id'] !== $key->client_id) {
-                return response()->json(['error' => 'Invalid client_id'], 401);
-            }
-
-            if ($scopes !== []) {
-                $scopes = array_map('strtolower', $scopes);
-
-                $tokenScopes = explode(' ', $payload['scope'] ?? '');
-
-                foreach ($scopes as $scope) {
-                    if (! in_array($scope, $tokenScopes)) {
-                        return response()->json(['error' => 'Insufficient scope'], 403);
-                    }
-                }
-            }
+            VaultClient::validate($token, $scopes);
 
             return $next($request);
-        } catch (Throwable $e) {
+        } catch (JwtException $e) {
+            Log::error('Validate JWT failed', [
+                'error' => 'Token validation failed',
+                'message' => $e->getMessage(),
+            ]);
+
             return response()->json([
-                'error' => 'Invalid token',
-                'error' => $e->getMessage(),
+                'error' => 'Token validation failed',
+                'message' => $e->getMessage(),
+            ], 401);
+        } catch (VaultException $e) {
+            Log::error('Validate JWT failed', [
+                'error' => 'Vault validation failed',
+                'message' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error' => 'Vault validation failed',
+                'message' => $e->getMessage(),
+            ], 401);
+        } catch (\Exception $e) {
+            Log::error('Validate JWT failed', [
+                'error' => 'Unexpected error',
+                'message' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error' => 'Unexpected error',
+                'message' => $e->getMessage(),
             ], 401);
         }
     }
