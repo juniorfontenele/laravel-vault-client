@@ -10,11 +10,8 @@ use Illuminate\Support\ServiceProvider;
 use JuniorFontenele\LaravelVaultClient\Console\Commands\VaultInstallCommand;
 use JuniorFontenele\LaravelVaultClient\Console\Commands\VaultKeyRotateCommand;
 use JuniorFontenele\LaravelVaultClient\Console\Commands\VaultProvisionClientCommand;
-use JuniorFontenele\LaravelVaultClient\Facades\VaultClientManager;
-use JuniorFontenele\LaravelVaultClient\Facades\VaultJWT;
-use JuniorFontenele\LaravelVaultClient\Facades\VaultKey;
+use JuniorFontenele\LaravelVaultClient\Facades\VaultClient;
 use JuniorFontenele\LaravelVaultClient\Http\Middlewares\ValidateJwtToken;
-use JuniorFontenele\LaravelVaultClient\Services\KeyPairService;
 use JuniorFontenele\LaravelVaultClient\Services\VaultClientService;
 
 class LaravelVaultClientServiceProvider extends ServiceProvider
@@ -33,15 +30,17 @@ class LaravelVaultClientServiceProvider extends ServiceProvider
             __DIR__ . '/../../config/vault.php' => config_path('vault.php'),
         ], 'config');
 
-        $this->app->singleton(KeyPairService::class, function ($app) {
-            return new KeyPairService();
+        $this->app->singleton(VaultClientService::class, function ($app) {
+            return new VaultClientService(
+                clientId: config('vault.client_id'),
+                vaultUrl: config('vault.url'),
+                issuer: config('vault.issuer'),
+                cacheTtl: config('vault.cache_ttl', 3600),
+            );
         });
 
         $loader = AliasLoader::getInstance();
-        $loader->alias('VaultKey', VaultKey::class);
-        $loader->alias('VaultClientManager', VaultClientManager::class);
-        $loader->alias('VaultJWT', VaultJWT::class);
-        $loader->alias('VaultClient', VaultClientService::class);
+        $loader->alias('VaultClient', VaultClient::class);
 
         /** @var Router $router */
         $router = app('router');

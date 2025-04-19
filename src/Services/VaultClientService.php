@@ -4,20 +4,26 @@ declare(strict_types = 1);
 
 namespace JuniorFontenele\LaravelVaultClient\Services;
 
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use JuniorFontenele\LaravelVaultClient\Exceptions\VaultException;
-use JuniorFontenele\LaravelVaultClient\Models\Key;
 use JuniorFontenele\LaravelVaultClient\Models\PrivateKey;
-use VaultJWT;
 
 class VaultClientService
 {
+    public function __construct(public string $clientId, public string $vaultUrl, public string $issuer, public int $cacheTtl = 3600)
+    {
+        $this->vaultUrl = rtrim($this->vaultUrl, '/');
+    }
+
     public function getPublicKey(string $kid): ?string
     {
-        return Cache::remember('vault:kid:' . $kid, config('vault.cache_ttl', 3600), function () use ($kid) {
-            $url = rtrim(config('vault.url'), '/') . '/kms/' . $kid;
+        return Cache::remember('vault:kid:' . $kid, $this->cacheTtl, function () use ($kid) {
+            $url = $this->vaultUrl . '/kms/' . $kid;
 
             $response = Http::acceptJson()->get($url);
 
@@ -32,7 +38,7 @@ class VaultClientService
                 return null;
             }
 
-            return $response->json()->get('public_key');
+            return $response->json('public_key');
         });
     }
 
@@ -43,17 +49,13 @@ class VaultClientService
      */
     public function rotateKey(): PrivateKey
     {
-        $privateKey = PrivateKey::getPrivateKey();
-
-        if (empty($privateKey)) {
-            throw new VaultException('No valid key found for the client.');
-        }
+        $privateKey = $this->loadPrivateKey();
 
         $scope = ['keys:rotate'];
 
-        $token = VaultJWT::sign($privateKey, $scope);
+        $token = $this->sign($privateKey, $scope);
 
-        $url = rtrim(config('vault.url'), '/') . '/kms/' . $privateKey->id . '/rotate';
+        $url = $this->vaultUrl . '/kms/' . $privateKey->id . '/rotate';
 
         $response = Http::acceptJson()
             ->withToken($token)
@@ -85,5 +87,73 @@ class VaultClientService
         $privateKey->revoke();
 
         return $newKey;
+    }
+
+    public function sign(PrivateKey $privateKey, ?array $scope = [], array $claims = [], array $headers = []): string
+    {
+        $kid = $privateKey->id;
+        $headers['kid'] = $kid;
+
+        $claims = array_merge([
+            'iss' => config('vault.issuer'),
+            'client_id' => config('vault.client_id'),
+            'nonce' => bin2hex(random_bytes(16)),
+            'iat' => time(),
+            'exp' => time() + config('vault.token_expiration_time', 60),
+            'jti' => (string) Str::uuid(),
+        ], $claims);
+
+        if (! empty($scope)) {
+            $claims['scope'] = implode(' ', $scope);
+        }
+
+        return JWT::encode($claims, $privateKey->private_key, 'RS256', $headers['kid'], $headers);
+    }
+
+    public function validate(string $jwt): object
+    {
+        $kid = $this->getKidFromJwtString($jwt);
+
+        if (empty($kid)) {
+            throw new VaultException('Kid not found in JWT');
+        }
+
+        $publicKey = $this->getPublicKey($kid);
+
+        if (empty($publicKey)) {
+            throw new VaultException('Public key not found for kid: ' . $kid);
+        }
+
+        return $this->decode($jwt, $publicKey);
+    }
+
+    public function getKidFromJwtString(string $jwt): ?string
+    {
+        $header = json_decode(base64_decode(explode('.', $jwt)[0]), true);
+
+        return $header['kid'] ?? null;
+    }
+
+    public function decode(string $jwt, string $publicKeyString, string $algorithm = 'RS256'): object
+    {
+        return JWT::decode($jwt, new Key($publicKeyString, $algorithm));
+    }
+
+    /**
+     * Load the private key from the database.
+     *
+     * @throws VaultException
+     *
+     * @return PrivateKey
+     */
+    public function loadPrivateKey(): PrivateKey
+    {
+        $privateKey = PrivateKey::getPrivateKey();
+
+        if (empty($privateKey)) {
+            throw new VaultException('No valid key found for the client.');
+        }
+
+        return $privateKey;
     }
 }

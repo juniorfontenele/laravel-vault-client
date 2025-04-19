@@ -29,6 +29,10 @@ class PrivateKey extends Model
         'valid_until',
     ];
 
+    protected $hidden = [
+        'private_key',
+    ];
+
     protected static function booted(): void
     {
         static::creating(function (self $key) {
@@ -146,7 +150,7 @@ class PrivateKey extends Model
     {
         return static::query()
             ->valid()
-            ->where('client_id', config('vault.client_id'))
+            ->orderBy('version', 'desc')
             ->first();
     }
 }
