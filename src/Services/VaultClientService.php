@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use JuniorFontenele\LaravelVaultClient\Enums\Permission;
 use JuniorFontenele\LaravelVaultClient\Exceptions\JwtException;
 use JuniorFontenele\LaravelVaultClient\Exceptions\VaultException;
 use JuniorFontenele\LaravelVaultClient\Models\PrivateKey;
@@ -52,7 +53,7 @@ class VaultClientService
     {
         $privateKey = $this->loadPrivateKey();
 
-        $scope = ['keys:rotate'];
+        $scope = [Permission::KEYS_ROTATE->value];
 
         $token = $this->sign($privateKey, $scope);
 
@@ -123,19 +124,7 @@ class VaultClientService
 
     public function validate(string $jwt, $scopes = []): void
     {
-        $kid = $this->getKidFromJwtString($jwt);
-
-        if (! $kid) {
-            throw new JwtException('Kid not found in JWT');
-        }
-
-        $publicKey = $this->getPublicKey($kid);
-
-        if (! $publicKey) {
-            throw new VaultException('Public key not found for kid: ' . $kid);
-        }
-
-        $decodedJwt = $this->decode($jwt, $publicKey['public_key']);
+        $decodedJwt = $this->decode($jwt);
 
         $payload = (array) $decodedJwt;
 
@@ -153,10 +142,6 @@ class VaultClientService
 
         if (Cache::has('vault:jti:' . $payload['jti'])) {
             throw new JwtException('Token is blacklisted');
-        }
-
-        if ($payload['client_id'] !== $publicKey['client_id']) {
-            throw new JwtException('Invalid client_id');
         }
 
         if ($scopes !== null && $scopes !== []) {
@@ -182,9 +167,28 @@ class VaultClientService
         return $header['kid'] ?? null;
     }
 
-    public function decode(string $jwt, string $publicKeyString, string $algorithm = 'RS256'): object
+    public function decode(string $jwt): object
     {
-        return JWT::decode($jwt, new Key($publicKeyString, $algorithm));
+        $kid = $this->getKidFromJwtString($jwt);
+
+        if (! $kid) {
+            throw new JwtException('Kid not found in JWT');
+        }
+
+        $key = $this->getPublicKey($kid);
+
+        if (! $key) {
+            throw new VaultException('Public key not found for kid: ' . $kid);
+        }
+
+        $decodedJwt = JWT::decode($jwt, new Key($key['public_key'], 'RS256'));
+        $payload = (array) $decodedJwt;
+
+        if ($payload['client_id'] !== $key['client_id']) {
+            throw new JwtException('Invalid client_id');
+        }
+
+        return $decodedJwt;
     }
 
     /**
@@ -205,11 +209,63 @@ class VaultClientService
         return $privateKey;
     }
 
-    public function validateJwt(string $publicKey): bool
+    public function getHashForUser(string $userId): ?string
     {
-        $publicKey = str_replace(['-----BEGIN PUBLIC KEY-----', '-----END PUBLIC KEY-----'], '', $publicKey);
-        $publicKey = str_replace("\n", '', $publicKey);
+        $url = $this->vaultUrl . '/hash/' . $userId;
 
-        return Str::length($publicKey) === 256;
+        $privateKey = $this->loadPrivateKey();
+        $scope = [Permission::HASHES_READ->value];
+        $token = $this->sign($privateKey, $scope);
+
+        $response = Http::acceptJson()->withToken($token)->get($url);
+
+        if ($response->failed()) {
+            Log::error('Failed to get user hash', [
+                'user_id' => $userId,
+                'url' => $url,
+                'status' => $response->status(),
+                'response' => $response->body(),
+            ]);
+
+            return null;
+        }
+
+        return $response->json('hash') ?? null;
+    }
+
+    public function storePasswordForUser(string $userId, string $password): bool
+    {
+        $privateKey = $this->loadPrivateKey();
+        $scope = [Permission::HASHES_CREATE->value];
+        $token = $this->sign($privateKey, $scope);
+
+        $url = $this->vaultUrl . '/hash/' . $userId;
+        $response = Http::acceptJson()->withToken($token)->post($url, [
+            'hash' => bcrypt($password),
+        ]);
+
+        if ($response->failed()) {
+            Log::error('Failed to store user hash', [
+                'user_id' => $userId,
+                'url' => $url,
+                'status' => $response->status(),
+                'response' => $response->json(),
+            ]);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    public function checkPasswordForUser(string $userId, string $password): bool
+    {
+        $hash = $this->getHashForUser($userId);
+
+        if (! $hash) {
+            return false;
+        }
+
+        return password_verify($password, $hash);
     }
 }
