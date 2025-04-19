@@ -103,7 +103,7 @@ class VaultClientService
             'jti' => (string) Str::uuid(),
         ], $claims);
 
-        if (! empty($scope)) {
+        if ($scope !== null && $scope !== []) {
             $claims['scope'] = implode(' ', $scope);
         }
 
@@ -114,13 +114,13 @@ class VaultClientService
     {
         $kid = $this->getKidFromJwtString($jwt);
 
-        if (empty($kid)) {
+        if ($kid === null || $kid === '' || $kid === '0') {
             throw new VaultException('Kid not found in JWT');
         }
 
         $publicKey = $this->getPublicKey($kid);
 
-        if (empty($publicKey)) {
+        if ($publicKey === null || $publicKey === '' || $publicKey === '0') {
             throw new VaultException('Public key not found for kid: ' . $kid);
         }
 
@@ -150,7 +150,7 @@ class VaultClientService
     {
         $privateKey = PrivateKey::getPrivateKey();
 
-        if (empty($privateKey)) {
+        if (!$privateKey instanceof \JuniorFontenele\LaravelVaultClient\Models\PrivateKey) {
             throw new VaultException('No valid key found for the client.');
         }
 

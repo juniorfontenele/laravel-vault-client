@@ -48,7 +48,7 @@ class ValidateJwtToken
                 return response()->json(['error' => 'Invalid client_id'], 401);
             }
 
-            if (! empty($scopes)) {
+            if ($scopes !== []) {
                 $scopes = array_map('strtolower', $scopes);
 
                 $tokenScopes = explode(' ', $payload['scope'] ?? '');

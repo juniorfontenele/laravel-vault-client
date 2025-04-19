@@ -26,7 +26,7 @@ class PrivateKeyFactory extends Factory
         $publicKey = $privateKey->getPublicKey();
 
         return [
-            'client_id' => $this->faker->uuid(),
+            'client_id' => fake()->uuid(),
             'private_key' => $privateKey->toString('PKCS8'),
             'public_key' => $publicKey->toString('PKCS8'),
             'version' => 1,
