@@ -31,6 +31,8 @@ enum Permission: string
             self::KEYS_ROTATE => 'Rotate Keys',
             self::HASHES_READ => 'Read Hashes',
             self::HASHES_CREATE => 'Create Hashes',
+            self::HASHES_DELETE => 'Delete Hashes',
+            default => $this->value,
         };
     }
 }
