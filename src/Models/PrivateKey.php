@@ -150,6 +150,7 @@ class PrivateKey extends Model
     {
         return static::query()
             ->valid()
+            ->where('client_id', config('vault.client_id'))
             ->orderBy('version', 'desc')
             ->first();
     }
