@@ -10,6 +10,7 @@ enum Permission: string
     case KEYS_ROTATE = 'keys:rotate';
     case HASHES_READ = 'hashes:read';
     case HASHES_CREATE = 'hashes:create';
+    case HASHES_DELETE = 'hashes:delete';
 
     public static function toArray(): array
     {

@@ -258,6 +258,29 @@ class VaultClientService
         return true;
     }
 
+    public function deleteHashForUser(string $userId): bool
+    {
+        $privateKey = $this->loadPrivateKey();
+        $scope = [Permission::HASHES_DELETE->value];
+        $token = $this->sign($privateKey, $scope);
+
+        $url = $this->vaultUrl . '/hash/' . $userId;
+        $response = Http::acceptJson()->withToken($token)->delete($url);
+
+        if ($response->failed()) {
+            Log::error('Failed to delete user hash', [
+                'user_id' => $userId,
+                'url' => $url,
+                'status' => $response->status(),
+                'response' => $response->json(),
+            ]);
+
+            return false;
+        }
+
+        return true;
+    }
+
     public function checkPasswordForUser(string $userId, string $password): bool
     {
         $hash = $this->getHashForUser($userId);
