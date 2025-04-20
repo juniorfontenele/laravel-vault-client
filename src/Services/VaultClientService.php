@@ -97,10 +97,9 @@ class VaultClientService
      * @param PrivateKey $privateKey
      * @param array<string, mixed> $claims
      * @param array<string, mixed> $headers
-     * @param array<string> $scope
      * @return string
      */
-    public function sign(PrivateKey $privateKey, ?array $scope = [], array $claims = [], array $headers = []): string
+    public function sign(PrivateKey $privateKey, array $claims = [], array $headers = []): string
     {
         /** @var string $kid */
         $kid = $privateKey->id;
@@ -115,49 +114,7 @@ class VaultClientService
             'jti' => (string) Str::uuid(),
         ], $claims);
 
-        if ($scope !== null && $scope !== []) {
-            $claims['scope'] = implode(' ', $scope);
-        }
-
         return JWT::encode($claims, $privateKey->private_key, 'RS256', $headers['kid'], $headers);
-    }
-
-    public function validate(string $jwt, $scopes = []): void
-    {
-        $decodedJwt = $this->decode($jwt);
-
-        $payload = (array) $decodedJwt;
-
-        if (empty($payload['nonce'])) {
-            throw new JwtException('Nonce not found in JWT');
-        }
-
-        if (Cache::has('vault:nonce:' . $payload['nonce'])) {
-            throw new JwtException('Nonce already used');
-        }
-
-        if (empty($payload['jti'])) {
-            throw new JwtException('JTI not found in JWT');
-        }
-
-        if (Cache::has('vault:jti:' . $payload['jti'])) {
-            throw new JwtException('Token is blacklisted');
-        }
-
-        if ($scopes !== null && $scopes !== []) {
-            $scopes = array_map('strtolower', $scopes);
-
-            $tokenScopes = explode(' ', $payload['scope'] ?? '');
-
-            foreach ($scopes as $scope) {
-                if (! in_array($scope, $tokenScopes)) {
-                    throw new JwtException('Insufficient scope');
-                }
-            }
-        }
-
-        Cache::put('vault:nonce:' . $payload['nonce'], true, $payload['exp'] - time());
-        Cache::put('vault:jti:' . $payload['jti'], true, $payload['exp'] - time());
     }
 
     public function getKidFromJwtString(string $jwt): ?string
