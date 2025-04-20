@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use JuniorFontenele\LaravelVaultClient\Enums\Permission;
 use JuniorFontenele\LaravelVaultClient\Exceptions\JwtException;
 use JuniorFontenele\LaravelVaultClient\Exceptions\VaultException;
 use JuniorFontenele\LaravelVaultClient\Models\PrivateKey;
@@ -53,9 +52,7 @@ class VaultClientService
     {
         $privateKey = $this->loadPrivateKey();
 
-        $scope = [Permission::KEYS_ROTATE->value];
-
-        $token = $this->sign($privateKey, $scope);
+        $token = $this->sign($privateKey);
 
         $url = $this->vaultUrl . '/kms/' . $privateKey->id . '/rotate';
 
@@ -171,8 +168,7 @@ class VaultClientService
         $url = $this->vaultUrl . '/hash/' . $userId;
 
         $privateKey = $this->loadPrivateKey();
-        $scope = [Permission::HASHES_READ->value];
-        $token = $this->sign($privateKey, $scope);
+        $token = $this->sign($privateKey);
 
         $response = Http::acceptJson()->withToken($token)->get($url);
 
@@ -193,8 +189,7 @@ class VaultClientService
     public function storePasswordForUser(string $userId, string $password): bool
     {
         $privateKey = $this->loadPrivateKey();
-        $scope = [Permission::HASHES_CREATE->value];
-        $token = $this->sign($privateKey, $scope);
+        $token = $this->sign($privateKey);
 
         $url = $this->vaultUrl . '/hash/' . $userId;
         $response = Http::acceptJson()->withToken($token)->post($url, [
@@ -218,8 +213,7 @@ class VaultClientService
     public function deleteHashForUser(string $userId): bool
     {
         $privateKey = $this->loadPrivateKey();
-        $scope = [Permission::HASHES_DELETE->value];
-        $token = $this->sign($privateKey, $scope);
+        $token = $this->sign($privateKey);
 
         $url = $this->vaultUrl . '/hash/' . $userId;
         $response = Http::acceptJson()->withToken($token)->delete($url);
