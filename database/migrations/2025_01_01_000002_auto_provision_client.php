@@ -19,7 +19,7 @@ return new class extends Migration
                 Artisan::call('vault:provision', [
                     'token' => config('vault.provisioning_token'),
                 ]);
-            } catch (Exception $e) {
+            } catch (Throwable $e) {
                 Log::error('Failed to auto-provision Vault client: ' . $e->getMessage());
             }
         }
