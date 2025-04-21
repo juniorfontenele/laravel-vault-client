@@ -3,7 +3,6 @@
 declare(strict_types = 1);
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use JuniorFontenele\LaravelVaultClient\Facades\VaultClient;
 
@@ -16,9 +15,7 @@ return new class extends Migration
     {
         if ($this->canAutoProvision()) {
             try {
-                Artisan::call('vault:provision', [
-                    'token' => config('vault.provisioning_token'),
-                ]);
+                VaultClient::provisionClient(config('vault.provisioning_token'));
             } catch (Throwable $e) {
                 Log::error('Failed to auto-provision Vault client: ' . $e->getMessage());
             }
