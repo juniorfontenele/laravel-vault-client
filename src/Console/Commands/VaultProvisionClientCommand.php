@@ -5,9 +5,8 @@ declare(strict_types = 1);
 namespace JuniorFontenele\LaravelVaultClient\Console\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
-use JuniorFontenele\LaravelVaultClient\Models\PrivateKey;
+use JuniorFontenele\LaravelVaultClient\Exceptions\VaultClientProvisioningException;
+use JuniorFontenele\LaravelVaultClient\Facades\VaultClient;
 
 use function Laravel\Prompts\text;
 
@@ -32,14 +31,14 @@ class VaultProvisionClientCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle(): void
+    public function handle(): int
     {
         $clientId = config('vault.client_id');
 
         if (empty($clientId)) {
             $this->error('Client ID is not set in the configuration.');
 
-            return;
+            return static::FAILURE;
         }
 
         $provisionToken = $this->argument('token') ?? text(
@@ -50,47 +49,29 @@ class VaultProvisionClientCommand extends Command
         if (empty($provisionToken)) {
             $this->error('Provision token is required.');
 
-            return;
+            return static::FAILURE;
         }
 
         if (! preg_match('/^[a-f0-9]{32}$/', $provisionToken)) {
             $this->error('Invalid provision token format. It should be a 32-character hexadecimal string.');
 
-            return;
+            return static::FAILURE;
         }
 
-        $url = config('vault.url') . "/client/{$clientId}/provision";
+        try {
+            VaultClient::provisionClient($provisionToken);
+        } catch (VaultClientProvisioningException $e) {
+            $this->error('Failed to provision client: ' . $e->getMessage());
 
-        $response = Http::acceptJson()->post($url, [
-            'provision_token' => $provisionToken,
-        ]);
+            return static::FAILURE;
+        } catch (\Exception $e) {
+            $this->error('An unexpected error occurred: ' . $e->getMessage());
 
-        if ($response->failed()) {
-            $this->error('Failed to provision the client. Please check the token and try again.');
-            Log::error('Failed to provision the client.', [
-                'status' => $response->status(),
-                'response' => $response->json(),
-            ]);
-
-            if ($response->json('error')) {
-                $this->error('Error: ' . $response->json('error'));
-            }
-
-            exit(static::FAILURE);
+            return static::FAILURE;
         }
-
-        $data = $response->json();
-
-        PrivateKey::create([
-            'id' => $data['kid'],
-            'client_id' => $clientId,
-            'private_key' => $data['private_key'],
-            'public_key' => $data['public_key'],
-            'version' => $data['version'],
-            'valid_from' => $data['valid_from'],
-            'valid_until' => $data['valid_until'],
-        ]);
 
         $this->info('Client provisioned successfully.');
+
+        return static::SUCCESS;
     }
 }

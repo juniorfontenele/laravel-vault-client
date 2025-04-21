@@ -11,7 +11,9 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use JuniorFontenele\LaravelVaultClient\Exceptions\JwtException;
+use JuniorFontenele\LaravelVaultClient\Exceptions\VaultClientProvisioningException;
 use JuniorFontenele\LaravelVaultClient\Exceptions\VaultException;
+use JuniorFontenele\LaravelVaultClient\Exceptions\VaultKeyException;
 use JuniorFontenele\LaravelVaultClient\Models\PrivateKey;
 use Throwable;
 
@@ -69,7 +71,7 @@ class VaultClientService
                 'response' => $response->json(),
             ]);
 
-            throw new VaultException('Failed to rotate the key: ' . ($response->json('error') ?? 'Unknown error'));
+            throw new VaultKeyException($response->json('error') ?? 'Unknown error');
         }
 
         $data = $response->json();
@@ -222,6 +224,30 @@ class VaultClientService
         return true;
     }
 
+    public function storeHashForUser(string $userId, string $hash): bool
+    {
+        $privateKey = $this->loadPrivateKey();
+        $token = $this->sign($privateKey);
+
+        $url = $this->vaultUrl . '/hash/' . $userId;
+        $response = Http::acceptJson()->withToken($token)->post($url, [
+            'hash' => $hash,
+        ]);
+
+        if ($response->failed()) {
+            Log::error('Failed to store user hash', [
+                'user_id' => $userId,
+                'url' => $url,
+                'status' => $response->status(),
+                'response' => $response->json(),
+            ]);
+
+            return false;
+        }
+
+        return true;
+    }
+
     public function deleteHashForUser(string $userId): bool
     {
         $privateKey = $this->loadPrivateKey();
@@ -253,5 +279,30 @@ class VaultClientService
         }
 
         return password_verify($password, $hash);
+    }
+
+    public function provisionClient(string $provisionToken): PrivateKey
+    {
+        $url = $this->vaultUrl . '/client/' . $this->clientId . '/provision';
+
+        $response = Http::acceptJson()->post($url, [
+            'provision_token' => $provisionToken,
+        ]);
+
+        if ($response->failed()) {
+            throw new VaultClientProvisioningException($response->json('error') ?? 'Unknown error');
+        }
+
+        $data = $response->json();
+
+        return PrivateKey::create([
+            'id' => $data['kid'],
+            'client_id' => $this->clientId,
+            'private_key' => $data['private_key'],
+            'public_key' => $data['public_key'],
+            'version' => $data['version'],
+            'valid_from' => $data['valid_from'],
+            'valid_until' => $data['valid_until'],
+        ]);
     }
 }
