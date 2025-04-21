@@ -34,7 +34,7 @@ class LaravelVaultClientServiceProvider extends ServiceProvider
             return new VaultClientService(
                 clientId: config('vault.client_id'),
                 vaultUrl: config('vault.url'),
-                issuer: config('vault.issuer', config('app.url')),
+                issuer: config('vault.issuer'),
                 cacheTtl: config('vault.cache_ttl', 3600),
             );
         });
