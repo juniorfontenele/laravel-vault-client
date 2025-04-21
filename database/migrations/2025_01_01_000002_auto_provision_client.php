@@ -16,8 +16,10 @@ return new class extends Migration
         if ($this->canAutoProvision()) {
             try {
                 VaultClient::provisionClient(config('vault.provisioning_token'));
+
+                Log::info('Vault client auto-provisioned successfully.');
             } catch (Throwable $e) {
-                Log::error('Failed to auto-provision Vault client: ' . $e->getMessage());
+                Log::error('Failed to auto-provision vault client: ' . $e->getMessage());
             }
         }
     }
