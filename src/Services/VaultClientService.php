@@ -13,6 +13,7 @@ use Illuminate\Support\Str;
 use JuniorFontenele\LaravelVaultClient\Exceptions\JwtException;
 use JuniorFontenele\LaravelVaultClient\Exceptions\VaultException;
 use JuniorFontenele\LaravelVaultClient\Models\PrivateKey;
+use Throwable;
 
 class VaultClientService
 {
@@ -161,6 +162,17 @@ class VaultClientService
         }
 
         return $privateKey;
+    }
+
+    public function privateKeyExists(): bool
+    {
+        try {
+            $this->loadPrivateKey();
+
+            return true;
+        } catch (Throwable $e) {
+            return false;
+        }
     }
 
     public function getHashForUser(string $userId): ?string
