@@ -16,5 +16,14 @@ testbench.yaml          export-ignore
 /artisan                export-ignore
 /.editorconfig          export-ignore
 /phpstan.neon.dist      export-ignore
+/phpstan.neon           export-ignore
 /phpstan-baseline.neon  export-ignore
 /.env.example           export-ignore
+/.devcontainer          export-ignore
+/.husky                 export-ignore
+/.vscode                export-ignore
+/.gitignore             export-ignore
+/CHANGELOG.md           export-ignore
+/pint.json              export-ignore
+/rector.php             export-ignore
+/package.json           export-ignore
