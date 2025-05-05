@@ -77,7 +77,7 @@ class VaultClientService
         $data = $response->json();
 
         $newKey = PrivateKey::create([
-            'id' => $data['kid'],
+            'id' => $data['key_id'],
             'client_id' => $data['client_id'],
             'private_key' => $data['private_key'],
             'public_key' => $data['public_key'],
@@ -296,7 +296,7 @@ class VaultClientService
         $data = $response->json();
 
         return PrivateKey::create([
-            'id' => $data['kid'],
+            'id' => $data['key_id'],
             'client_id' => $this->clientId,
             'private_key' => $data['private_key'],
             'public_key' => $data['public_key'],
