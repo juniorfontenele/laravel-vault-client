@@ -7,6 +7,7 @@ namespace JuniorFontenele\LaravelVaultClient\Providers;
 use Illuminate\Foundation\AliasLoader;
 use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
+use JuniorFontenele\LaravelSecureJwt\JwtConfig;
 use JuniorFontenele\LaravelVaultClient\Console\Commands\VaultInstallCommand;
 use JuniorFontenele\LaravelVaultClient\Console\Commands\VaultKeyRotateCommand;
 use JuniorFontenele\LaravelVaultClient\Console\Commands\VaultProvisionClientCommand;
@@ -29,6 +30,15 @@ class LaravelVaultClientServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__ . '/../../config/vault.php' => config_path('vault.php'),
         ], 'config');
+
+        $this->app->singleton(JwtConfig::class, function () {
+            return new JwtConfig(
+                issuer: config('vault.issuer'),
+                ttl: config('vault.token_expiration_time'),
+                nonceTtl: config('vault.nonce_ttl'),
+                blacklistTtl: config('vault.blacklist_ttl'),
+            );
+        });
 
         $this->app->singleton(VaultClientService::class, function ($app) {
             return new VaultClientService(

@@ -9,7 +9,9 @@ use Firebase\JWT\Key;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
+use JuniorFontenele\LaravelSecureJwt\CustomClaims;
+use JuniorFontenele\LaravelSecureJwt\Facades\SecureJwt;
+use JuniorFontenele\LaravelSecureJwt\JwtKey;
 use JuniorFontenele\LaravelVaultClient\Exceptions\JwtException;
 use JuniorFontenele\LaravelVaultClient\Exceptions\VaultClientProvisioningException;
 use JuniorFontenele\LaravelVaultClient\Exceptions\VaultException;
@@ -99,22 +101,17 @@ class VaultClientService
      * @param array<string, mixed> $headers
      * @return string
      */
-    public function sign(PrivateKey $privateKey, array $claims = [], array $headers = []): string
+    public function sign(PrivateKey $privateKey, array $claims = []): string
     {
         /** @var string $kid */
         $kid = $privateKey->id;
-        $headers['kid'] = $kid;
 
-        $claims = array_merge([
-            'iss' => config('vault.issuer'),
-            'client_id' => config('vault.client_id'),
-            'nonce' => bin2hex(random_bytes(16)),
-            'iat' => time(),
-            'exp' => time() + config('vault.token_expiration_time', 60),
-            'jti' => (string) Str::uuid(),
-        ], $claims);
+        $customClaims = new CustomClaims($claims);
 
-        return JWT::encode($claims, $privateKey->private_key, 'RS256', $headers['kid'], $headers);
+        return SecureJwt::encode(
+            $customClaims,
+            new JwtKey($kid, $privateKey->private_key, 'RS256'),
+        );
     }
 
     public function getKidFromJwtString(string $jwt): ?string
