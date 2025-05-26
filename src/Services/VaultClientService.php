@@ -4,14 +4,13 @@ declare(strict_types = 1);
 
 namespace JuniorFontenele\LaravelVaultClient\Services;
 
-use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use JuniorFontenele\LaravelSecureJwt\CustomClaims;
 use JuniorFontenele\LaravelSecureJwt\Facades\SecureJwt;
 use JuniorFontenele\LaravelSecureJwt\JwtKey;
+use JuniorFontenele\LaravelSecureJwt\SecureJwt as SecureJwtObject;
 use JuniorFontenele\LaravelVaultClient\Exceptions\JwtException;
 use JuniorFontenele\LaravelVaultClient\Exceptions\VaultClientProvisioningException;
 use JuniorFontenele\LaravelVaultClient\Exceptions\VaultException;
@@ -106,7 +105,11 @@ class VaultClientService
         /** @var string $kid */
         $kid = $privateKey->id;
 
-        $customClaims = new CustomClaims($claims);
+        $mergedClaims = array_merge([
+            'client_id' => $this->clientId,
+        ], $claims);
+
+        $customClaims = new CustomClaims($mergedClaims);
 
         return SecureJwt::encode(
             $customClaims,
@@ -121,7 +124,7 @@ class VaultClientService
         return $header['kid'] ?? null;
     }
 
-    public function decode(string $jwt): object
+    public function decode(string $jwt): SecureJwtObject
     {
         $kid = $this->getKidFromJwtString($jwt);
 
@@ -135,8 +138,8 @@ class VaultClientService
             throw new VaultException('Public key not found for kid: ' . $kid);
         }
 
-        $decodedJwt = JWT::decode($jwt, new Key($key['public_key'], 'RS256'));
-        $payload = (array) $decodedJwt;
+        $decodedJwt = SecureJwt::decode($jwt, new JwtKey($kid, $key['public_key'], 'RS256'));
+        $payload = $decodedJwt->payload();
 
         if ($payload['client_id'] !== $key['client_id']) {
             throw new JwtException('Invalid client_id');

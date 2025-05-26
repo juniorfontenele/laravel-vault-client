@@ -29,15 +29,18 @@ class VaultInstallCommand extends Command
      */
     public function handle(): void
     {
+        $this->call('vendor:publish', [
+            '--tag' => 'vault-client-migrations',
+            '--force' => $this->option('force'),
+        ]);
+
         $runMigrations = confirm(
             'Do you want to run the migrations now? (y/n)',
             true,
         );
 
         if ($runMigrations) {
-            $this->call('migrate', [
-                '--realpath' => __DIR__ . '/../../../database/migrations',
-            ]);
+            $this->call('migrate');
         }
 
         $this->info('Installation completed successfully.');

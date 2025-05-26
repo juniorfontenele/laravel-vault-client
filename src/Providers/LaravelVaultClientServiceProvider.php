@@ -22,14 +22,13 @@ class LaravelVaultClientServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
-        $this->publishes([
+        $this->publishesMigrations([
             __DIR__ . '/../../database/migrations' => database_path('migrations'),
-        ], 'migrations');
+        ], 'vault-client-migrations');
 
         $this->publishes([
             __DIR__ . '/../../config/vault.php' => config_path('vault.php'),
-        ], 'config');
+        ], 'vault-client-config');
 
         $this->app->singleton(JwtConfig::class, function () {
             return new JwtConfig(

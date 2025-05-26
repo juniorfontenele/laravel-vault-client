@@ -35,6 +35,7 @@ class TestCase extends OrchestraTestCase
     protected function getPackageProviders($app)
     {
         return [
+            \JuniorFontenele\LaravelSecureJwt\Providers\LaravelSecureJwtServiceProvider::class,
             \JuniorFontenele\LaravelVaultClient\Providers\LaravelVaultClientServiceProvider::class,
         ];
     }
@@ -63,6 +64,7 @@ class TestCase extends OrchestraTestCase
             $config->set('vault.client_id', 'test-client-id');
             $config->set('vault.url', 'https://vault.example.com');
             $config->set('vault.issuer', 'https://vault.example.com');
+            $config->set('vault.migrations.table_prefix', 'vault_');
         });
     }
 
