@@ -58,7 +58,7 @@ class VaultClientService
 
         $token = $this->sign($privateKey);
 
-        $url = $this->vaultUrl . '/kms/' . $privateKey->id . '/rotate';
+        $url = $this->vaultUrl . '/kms/rotate';
 
         $response = Http::acceptJson()
             ->withToken($token)
